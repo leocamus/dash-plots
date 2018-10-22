@@ -1,59 +1,62 @@
-import os
 import dash
-import pandas as pd
 import datetime as dt
 import dash_html_components as html
 import dash_core_components as dcc
-from utils import constants
 from dash.dependencies import Input, Output
-
-def read_data():
-    waze_dir = constants.waze_dir
-    travel_times = os.path.join(waze_dir, 'tiempoviaje-12-10-2018.csv')
-    routes = os.path.join(waze_dir, 'ruta-12-10-2018.csv')
-
-    df_travel_times = pd.read_csv(travel_times, sep=',', encoding='latin-1', parse_dates = ['tvjfechaextraccion'])
-    df_travel_times['fecha_extraccion'] = df_travel_times['tvjfechaextraccion'].dt.date
-    df_travel_times['tiempo_extraccion'] = df_travel_times['tvjfechaextraccion'].dt.time
-
-    columns_datetime = ['rtahorariocomienzo','rtahorariofinal','rtafechacreacion']
-    df_routes = pd.read_csv(routes,sep=';', encoding='latin-1', parse_dates = columns_datetime)
-    df_routes['rtahorariocomienzo'] = df_routes['rtahorariocomienzo'].dt.time
-    df_routes['rtahorariofinal'] = df_routes['rtahorariofinal'].dt.time
-
-    df_travel_times = df_travel_times.merge(df_routes[['rtaid','length']], on='rtaid', how='left')
-    df_travel_times['tvjtiempo/length'] = df_travel_times['tvjtiempo'] / df_travel_times['length']
-
-    return df_travel_times, df_routes
+from retrieve_data import *
+import plotly.graph_objs as go
+from plotly import tools
 
 
 def create_dash_app(df):
     app = dash.Dash()
     app.layout = html.Div(children=[
-        html.H1(children='Waze Travel Times'), #This component generates a <h1></h1> HTML element in your application
+        # This component generates a <h1></h1> HTML element in your application
+        html.H1(children='Travel Times'),
+        # The dcc describe higher-level components that are interactive
         dcc.Dropdown(
-            id = 'query-dates',
-            options=[{'label': i.strftime("%d-%m-%Y"), 'value': i} for i in df['fecha_extraccion'].unique()],
-            value='MTL'
+            id='query-dates',
+            options=[{'label': i.strftime("%d-%m-%Y"), 'value': i}
+                     for i in df['fecha_extraccion'].unique()],
+            # This is the default value
+            value='2018-09-28'
         ),
-        #The dcc describe higher-level components that are interactive 
+        dcc.Dropdown(
+            id='query-routes',
+            options=[{'label': i, 'value': i}
+                     for i in df['rtanombre'].unique()],
+            multi=True,
+            value='None'
+        ),
         dcc.Graph(
-            id='waze-graph'
+            id='travel-times-graph'
         )
     ])
 
-    @app.callback(Output('waze-graph', 'figure'), [Input('query-dates', 'value')])
-    def update_graph(selected_dropdown_value):
-        #Be aware that the selected_dropdown_value is a string!
-        selected_dropdown_value = dt.datetime.strptime(selected_dropdown_value, '%Y-%m-%d').date()
-        x_70 = df.loc[(df['rtaid']==70)&(df['fecha_extraccion']==selected_dropdown_value),'tiempo_extraccion']
+    @app.callback(Output('travel-times-graph', 'figure'), [Input('query-dates', 'value'), Input('query-routes', 'value')])
+    def update_graph(sd1, sd2s):
+        # Be aware that the sd1 is a string!
+        # Be aware that the sd2 is a list because of the multi=True!
+        sd1 = dt.datetime.strptime(sd1, '%Y-%m-%d').date()
 
-        y_70 = df.loc[(df['rtaid']==70)&(df['fecha_extraccion']==selected_dropdown_value),'tvjtiempo/length']
-        y_72 = df.loc[(df['rtaid']==72)&(df['fecha_extraccion']==selected_dropdown_value),'tvjtiempo/length']
-        
-        return {
-            'data': [{'x': x_70,'y': y_70}, {'x': x_70,'y': y_72}]
-        }
+        dff = df[df['fecha_extraccion'] == sd1]
+        fig = tools.make_subplots(rows=1, cols=1, shared_xaxes=True,
+                                  shared_yaxes=True, vertical_spacing=0.001)
+#        data = []
+        for sd2 in sd2s:
+            trace = go.Scatter(
+                x=dff.loc[dff['rtanombre'] == sd2, 'tiempo_extraccion'],
+                y=dff.loc[dff['rtanombre'] == sd2, 'tvjtiempo/length'],
+                mode='lines')
+    #            data.append(trace)
+            fig.append_trace(trace,1,1)
+
+        return fig
+
+ #       return {
+            #'data': data
+ #           'figure' : fig
+ #       }
 
     return app
 

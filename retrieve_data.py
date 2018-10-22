@@ -19,7 +19,7 @@ def read_data():
     df_travel_times['tiempo_extraccion'] = df_travel_times['tvjfechaextraccion'].dt.time
 
     columns_datetime = ['rtahorariocomienzo','rtahorariofinal','rtafechacreacion']
-    df_routes = pd.read_csv(routes,sep=',', encoding='latin-1', parse_dates = columns_datetime)
+    df_routes = pd.read_csv(routes,sep=';', encoding='latin-1', parse_dates = columns_datetime)
     df_routes['rtahorariocomienzo'] = df_routes['rtahorariocomienzo'].dt.time
     df_routes['rtahorariofinal'] = df_routes['rtahorariofinal'].dt.time
 

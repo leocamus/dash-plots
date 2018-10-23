@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import datetime as dt
 from utils import constants
 
 def query_database(freq):
@@ -9,22 +10,39 @@ def query_database(freq):
     pass
 
 def read_data():
-    #Should be replaced for a connection to a ddbb'''
+    #Should be replaced for a connection to a ddbb
     travel_times_dir = constants.travel_times_dir
-    travel_times = os.path.join(travel_times_dir, 'tiempoviaje-12-10-2018.csv')
-    routes = os.path.join(travel_times_dir, 'ruta-12-10-2018.csv')
+    travel_times = os.path.join(travel_times_dir, 'travel_times_23.10.2018.csv')
+    routes = os.path.join(travel_times_dir, 'routes_23.10.2018.csv')
 
-    df_travel_times = pd.read_csv(travel_times, sep=',', encoding='latin-1', parse_dates = ['tvjfechaextraccion'])
-    df_travel_times['fecha_extraccion'] = df_travel_times['tvjfechaextraccion'].dt.date
-    df_travel_times['tiempo_extraccion'] = df_travel_times['tvjfechaextraccion'].dt.time
+    df_tt = pd.read_csv(travel_times, sep=';', encoding='latin-1', parse_dates = ['updatetime'])
+    df_r = pd.read_csv(routes, sep=';', encoding='latin-1', parse_dates = ['start_date'])
 
-    columns_datetime = ['rtahorariocomienzo','rtahorariofinal','rtafechacreacion']
-    df_routes = pd.read_csv(routes,sep=';', encoding='latin-1', parse_dates = columns_datetime)
-    df_routes['rtahorariocomienzo'] = df_routes['rtahorariocomienzo'].dt.time
-    df_routes['rtahorariofinal'] = df_routes['rtahorariofinal'].dt.time
+    return df_tt, df_r
 
-    df_travel_times = df_travel_times.merge(df_routes[['rtaid','length','rtanombre']], on='rtaid', how='left')
-    df_travel_times['tvjtiempo/length'] = df_travel_times['tvjtiempo'] / df_travel_times['length']
+def process_data(df_tt, df_r):
+    
+    df_tt['updatetime_stgo'] = df_tt['updatetime'].apply(lambda x: x - pd.Timedelta('3 hours'))
+    
+    df_tt['date_ext'] = df_tt['updatetime_stgo'].dt.date
+    df_tt['time_ext'] = df_tt['updatetime_stgo'].dt.time
+    
+#    df_tt['updatetime_stgo'] = df_tt['updatetime_stgo'].apply(lambda x: x.to_pydatetime())
 
-    return df_travel_times, df_routes
+    df_tt = df_tt.merge(df_r[['name','length']], on='name', how='left')
+    df_tt = df_tt.loc[df_tt['length'].isnull()==False,:]
+    df_tt['time/length'] = (df_tt['time'] / (df_tt['length']))*1000
+    #Only saturday, sunday and monday
+    sat = dt.date(2018, 10, 20)
+    sun = dt.date(2018, 10, 21)
+    mon = dt.date(2018, 10, 22)
 
+    df_tt = df_tt.loc[(df_tt['date_ext'] == sat)|(df_tt['date_ext'] == sun)|(df_tt['date_ext'] == mon),:]
+
+    return df_tt
+
+
+def assemble_data():
+    [df_tt, df_r] = read_data()
+    df_tt = process_data(df_tt,df_r)
+    return df_tt, df_r

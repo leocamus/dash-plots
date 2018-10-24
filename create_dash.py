@@ -11,6 +11,7 @@ import pandas as pd
 
 def create_dash_app(df):
     app = dash.Dash()
+
     app.layout = html.Div(children=[
         # This component generates a <h1></h1> HTML element in your application
         html.H1(children='Travel Times'),
@@ -55,11 +56,12 @@ def create_dash_app(df):
             print('Selected dropdown value for the second dropdown menu is: ' + sd2 + '. The type of the' + 
             ' selected dropdown value for the second dropdown menu is: ' + str(type(sd2)))
 
-            sd2 = dt.datetime.strptime(sd2, '%Y-%m-%d').date()
+            sd2_d = dt.datetime.strptime(sd2, '%Y-%m-%d').date()
             trace = go.Scatter(
-                x = dff.loc[dff['date_ext'] == sd2, 'updatetime_stgo'].apply(temporal_transform),
-                y = dff.loc[dff['date_ext'] == sd2, 'time/length'],
-                mode='lines')
+                x = dff.loc[dff['date_ext'] == sd2_d, 'updatetime_stgo'].apply(temporal_transform),
+                y = dff.loc[dff['date_ext'] == sd2_d, 'time/length'],
+                mode='lines+markers',
+                name = sd2)
     #            data.append(trace)
             fig.append_trace(trace,1,1)
 

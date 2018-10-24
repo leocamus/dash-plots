@@ -1,0 +1,13 @@
+version: "3"
+services:
+  python:
+    image: python:3-slim #This image should already be installed (pulled) from docker hub.
+    ports:
+      - "5000:5000" #Host:Container mapping
+    volumes:
+      - ".:/app" #Host directory mapped to a Container directory. This is of bind mounted type. There are other instructions to make this as volume type.
+                 #All files from the host directory are copied to the /app directory inside the container.
+    stdin_open: true #Same as -i = --interactive: "Keep STDIN open even if not attached"
+    tty: true #Same as -t = --tty: "Allocate a pseudo-TTY"
+    entrypoint: ["bash"] #This is the instruction in CMD when the container is built.
+    

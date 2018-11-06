@@ -7,15 +7,17 @@ from retrieve_data import assemble_data
 import plotly.graph_objs as go
 from plotly import tools
 import pandas as pd
+import urllib
 
 
 def create_dash_app(df_w, df_g):
     app = dash.Dash()
 
-    app.layout = html.Div(children=[
+    app.layout = html.Div([
         # This component generates a <h1></h1> HTML element in your application
-        html.H1('Travel Times'),
+        html.H1('Tiempos de viaje'),
         # The dcc describe higher-level components that are interactive
+        html.Label('Selecciona la ruta'),
         dcc.Dropdown(
             id='query-routes',
             options=[{'label': i, 'value': i}
@@ -23,17 +25,29 @@ def create_dash_app(df_w, df_g):
             # This is the default value
             value= df_w.iloc[0,0] #This is a string, ok!
         ),
+        html.Label('Selecciona la fecha'),
         dcc.Dropdown(
             id='query-dates',
             options=[{'label': i.strftime("%d-%m-%Y"), 'value': i}
                      for i in df_w['date'].unique()],
-            multi = True,
+#           multi = True,
+            multi = False,
             value = df_w.loc[:,'date'].min()
+        ),
+        html.A(
+            'Download Data',
+            id='download-link',
+            download="rawdata.csv",
+            href="",
+            target="_blank"
         ),
         dcc.Graph(
             id='travel-times-graph'
         )
     ])
+
+    def filter_data(sd1,sd2s):
+        
 
     @app.callback(Output('travel-times-graph', 'figure'), [Input('query-routes', 'value'), Input('query-dates', 'value')])
     def update_graph(sd1, sd2s):
@@ -43,13 +57,14 @@ def create_dash_app(df_w, df_g):
         dff_w = df_w[df_w['name'] == sd1]
         dff_g = df_g[df_g['name'] == sd1]
 
-        fig = tools.make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.00001)
+#        fig = tools.make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.00001)
+        fig = tools.make_subplots(rows=1, cols=1, shared_xaxes = True, shared_yaxes = True)
 
 
         def temporal_transform(x):
-            #this is an ugly function.
-            x = x.replace(day = 22)
-            #This is shitty.
+            #this should not be necessary.
+#            x = x.replace(day = 22)
+            #This is weird
             x = x - pd.Timedelta('3 hours')
             return x
 
@@ -66,7 +81,9 @@ def create_dash_app(df_w, df_g):
             trace_w = create_traces(dff_w, sd2s, "waze")
             trace_g = create_traces(dff_g, sd2s, "gps")
             fig.append_trace(trace_w,1,1)
-            fig.append_trace(trace_g,2,1)
+#            fig.append_trace(trace_g,2,1)
+            fig.append_trace(trace_g,1,1)
+            fig['data'][1]['marker']['symbol'] = 'triangle-down'
 
         else:
             for sd2 in sd2s:
@@ -74,13 +91,21 @@ def create_dash_app(df_w, df_g):
                 trace_w = create_traces(dff_w, sd2, "waze")
                 trace_g = create_traces(dff_g, sd2, "gps")
                 fig.append_trace(trace_w,1,1)
-                fig.append_trace(trace_g,2,1)
-
-        fig['layout'].update(height=600, width=1200)
+#                fig.append_trace(trace_g,2,1)
+                fig.append_trace(trace_g,1,1)        
 
         return fig
 
+    @app.callback(Output('download-link', 'href'),[Input('query-routes', 'value'), Input('query-dates', 'value')])
+    def update_download_link(sd1, sd2s):
+        dff = filter_data(filter_value)
+        csv_string = dff.to_csv(index=False, encoding='utf-8')
+        csv_string = "data:text/csv;charset=utf-8," + urllib.quote(csv_string)
+        return csv_string
+
     return app
+
+
 
 
 if __name__ == '__main__':

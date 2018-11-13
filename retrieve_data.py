@@ -86,4 +86,4 @@ def assemble_data(extraction_date, *args):
     [df_tt_w, df_r_w] = read_waze_data(extraction_date)
     grouped_df_tt_w = process_waze_data(df_tt_w, df_r_w)
     grouped_df_tt_g = read_gps_data(*args)
-    return grouped_df_tt_w, grouped_df_tt_g
+    return grouped_df_tt_w, grouped_df_tt_g, df_r_w

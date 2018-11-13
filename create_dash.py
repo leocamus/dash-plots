@@ -7,11 +7,19 @@ from retrieve_data import assemble_data
 import plotly.graph_objs as go
 from plotly import tools
 import pandas as pd
+import numpy as np
 import urllib
+from utils import constants, tokens
+import os
 
 
-def create_dash_app(df_w, df_g):
-    app = dash.Dash()
+def create_dash_app(df_w, df_g, df_r):
+    app = dash.Dash('Travel Times')
+
+    travel_times_dir = constants.travel_times_dir
+    test_dir = os.path.join(travel_times_dir, 'maps/test.html')
+
+    mapbox_access_token = tokens.mapbox_token
 
     app.layout = html.Div([
         # This component generates a <h1></h1> HTML element in your application
@@ -30,12 +38,10 @@ def create_dash_app(df_w, df_g):
             id='query-dates',
             options=[{'label': i.strftime("%d-%m-%Y"), 'value': i}
                      for i in df_w['date'].unique()],
-#           multi = True,
-            multi = False,
             value = df_w.loc[:,'date'].min()
         ),
         html.A(
-            'Download Data',
+            'Descargar Datos',
             id='download-link',
             download="rawdata.csv",
             href="",
@@ -43,72 +49,103 @@ def create_dash_app(df_w, df_g):
         ),
         dcc.Graph(
             id='travel-times-graph'
+        ),
+        dcc.Graph(
+            id='map-routes'
         )
     ])
 
-    def filter_data(sd1,sd2s):
+    def filter_data(df, query_route, query_date):
+        sd2_d = dt.datetime.strptime(query_date, '%Y-%m-%d').date()
+        dff = df.loc[(df['name'] == query_route)&(df['date'] == sd2_d),['updatetime','time/length']]
+        return dff
         
 
     @app.callback(Output('travel-times-graph', 'figure'), [Input('query-routes', 'value'), Input('query-dates', 'value')])
-    def update_graph(sd1, sd2s):
-        # Be aware that the sd1 is (always) a string!
-        # Be aware that the sd2 is a list (of strings) because of the multi=True!
+    def update_graph(query_route, query_date):
+        # Be aware that the query_route and query_date are (always) strings!
 
-        dff_w = df_w[df_w['name'] == sd1]
-        dff_g = df_g[df_g['name'] == sd1]
-
-#        fig = tools.make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.00001)
         fig = tools.make_subplots(rows=1, cols=1, shared_xaxes = True, shared_yaxes = True)
 
-
         def temporal_transform(x):
-            #this should not be necessary.
-#            x = x.replace(day = 22)
             #This is weird
             x = x - pd.Timedelta('3 hours')
             return x
 
-        def create_traces(df, query_date, source):
+        def create_traces(df, source):
+            dff = filter_data(df,query_route,query_date)
             trace = go.Scatter(
-                x = df.loc[df['date'] == sd2_d, 'updatetime'].apply(temporal_transform),
-                y = df.loc[df['date'] == sd2_d, 'time/length'],
+                x = dff.loc[:,'updatetime'].apply(temporal_transform),
+                y = dff.loc[:,'time/length'],
                 mode='lines+markers',
                 name = query_date + " " + source)
-            return trace         
-        
-        if type(sd2s) == str:
-            sd2_d = dt.datetime.strptime(sd2s, '%Y-%m-%d').date()
-            trace_w = create_traces(dff_w, sd2s, "waze")
-            trace_g = create_traces(dff_g, sd2s, "gps")
-            fig.append_trace(trace_w,1,1)
-#            fig.append_trace(trace_g,2,1)
-            fig.append_trace(trace_g,1,1)
-            fig['data'][1]['marker']['symbol'] = 'triangle-down'
+            return trace
+       
+        trace_w = create_traces(df_w, "waze")        
+        trace_g = create_traces(df_g, "gps")
 
-        else:
-            for sd2 in sd2s:
-                sd2_d = dt.datetime.strptime(sd2, '%Y-%m-%d').date()
-                trace_w = create_traces(dff_w, sd2, "waze")
-                trace_g = create_traces(dff_g, sd2, "gps")
-                fig.append_trace(trace_w,1,1)
-#                fig.append_trace(trace_g,2,1)
-                fig.append_trace(trace_g,1,1)        
+        fig.append_trace(trace_w,1,1)        
+        fig.append_trace(trace_g,1,1)
+        
+        fig['data'][1]['marker']['symbol'] = 'triangle-down'
 
         return fig
 
     @app.callback(Output('download-link', 'href'),[Input('query-routes', 'value'), Input('query-dates', 'value')])
-    def update_download_link(sd1, sd2s):
-        dff = filter_data(filter_value)
+    def update_download_link(query_route, query_date):
+        dff_w = filter_data(df_w, query_route, query_date)
+        dff_g = filter_data(df_g, query_route, query_date)
+        dff = dff_w.merge(dff_g, on='updatetime', how='left', suffixes=('_waze','_gps'))
         csv_string = dff.to_csv(index=False, encoding='utf-8')
-        csv_string = "data:text/csv;charset=utf-8," + urllib.quote(csv_string)
+        csv_string = "data:text/csv;charset=utf-8," + urllib.parse.quote(csv_string)
         return csv_string
+
+    @app.callback(Output('map-routes', 'figure'),[Input('query-routes', 'value')])
+    def update_map(query_route):
+
+        def changing_line(x):
+            x = x.replace("[","")
+            x = x.replace("]","")
+            x = x.replace("(","")
+            x = x.replace(")","")    
+            return pd.Series(x.split(","))
+            
+        line = df_r.loc[df_r['name']==query_route, 'line'].apply(changing_line)
+
+        line.columns = [np.arange(len(line.columns)) % 2, np.arange(len(line.columns)) // 2]
+        line = line.stack().reset_index(drop=True)
+        line.columns = ['lon','lat']
+
+        lat = line.loc[:,'lat'].tolist()
+        lon = line.loc[:,'lon'].tolist()
+
+        data=[
+            go.Scattermapbox(
+                lat=lat,
+                lon=lon,
+                mode='markers',
+                marker=dict(size=13)
+                )
+            ]
+
+        layout = go.Layout(
+            autosize=True,
+            hovermode='closest',
+            mapbox=dict(
+            accesstoken=mapbox_access_token,
+            bearing=0,
+            center=dict(lat=float(lat[0]),lon=float(lon[0])),
+            pitch=0,
+            zoom=14
+            )
+        )
+        
+        fig = dict(data=data, layout=layout)
+        return fig      
 
     return app
 
-
-
-
 if __name__ == '__main__':
-    [grouped_df_tt_w, grouped_df_tt_g] = assemble_data('29.10.2018', '24.10.2018', '25.10.2018')
-    app = create_dash_app(grouped_df_tt_w, grouped_df_tt_g)
+    [grouped_df_tt_w, grouped_df_tt_g, df_r_w] = assemble_data('13.11.2018', '24.10.2018', '25.10.2018')
+    app = create_dash_app(grouped_df_tt_w, grouped_df_tt_g, df_r_w)
     app.run_server()

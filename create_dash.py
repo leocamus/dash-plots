@@ -48,10 +48,10 @@ def create_dash_app(df_w, df_g, df_r):
             target="_blank"
         ),
         dcc.Graph(
-            id='travel-times-graph'
+            id='map-routes'
         ),
         dcc.Graph(
-            id='map-routes'
+            id='travel-times-graph'
         )
     ])
 
@@ -87,7 +87,19 @@ def create_dash_app(df_w, df_g, df_r):
         fig.append_trace(trace_w,1,1)        
         fig.append_trace(trace_g,1,1)
         
+        max_w = 0
+        if trace_w.y.size>0:
+            max_w = max(trace_w.y)
+        
+        max_g = 0
+        if trace_g.y.size > 0:
+            max_g = max(trace_g.y)
+        
+        max_y_value = max(max_w,max_g) + 25
+
+        #Don't like this. Consider to refactor it.
         fig['data'][1]['marker']['symbol'] = 'triangle-down'
+        fig.layout.yaxis.update({'title': 'Tiempo de viaje [s/km]','dtick':50, 'range': [0,max_y_value]})
 
         return fig
 
@@ -107,10 +119,10 @@ def create_dash_app(df_w, df_g, df_r):
             x = x.replace("[","")
             x = x.replace("]","")
             x = x.replace("(","")
-            x = x.replace(")","")    
+            x = x.replace(")","")
             return pd.Series(x.split(","))
-            
-        line = df_r.loc[df_r['name']==query_route, 'line'].apply(changing_line)
+                    
+        line = df_r_w.loc[df_r_w['name']==query_route, 'line'].apply(changing_line)
 
         line.columns = [np.arange(len(line.columns)) % 2, np.arange(len(line.columns)) // 2]
         line = line.stack().reset_index(drop=True)
@@ -118,6 +130,26 @@ def create_dash_app(df_w, df_g, df_r):
 
         lat = line.loc[:,'lat'].tolist()
         lon = line.loc[:,'lon'].tolist()
+
+        geojson_dict = {"id": "route", 
+                                "type": "line",
+                                "source":{
+                                    "type": "geojson",
+                                    "data": {
+                                        "type": "Feature",
+                                        "geometry": {
+                                            "type": "LineString",
+                                            "coordinates": [[float(lat[x]), float(lon[x])] for x in range(0,len(lat))]
+                                        }
+                                    }
+                                }}
+
+        layers=[dict(sourcetype = 'geojson',
+                source =geojson_dict,
+                color='rgb(0,0,230)',
+                type = 'line',
+                line=dict(width=1.5))
+            ]
 
         data=[
             go.Scattermapbox(
@@ -133,14 +165,15 @@ def create_dash_app(df_w, df_g, df_r):
             hovermode='closest',
             mapbox=dict(
             accesstoken=mapbox_access_token,
+            layers = layers,
             bearing=0,
             center=dict(lat=float(lat[0]),lon=float(lon[0])),
             pitch=0,
-            zoom=14
+            zoom=11
             )
         )
         
-        fig = dict(data=data, layout=layout)
+        fig = dict(data = data, layout=layout)
         return fig      
 
     return app

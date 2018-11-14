@@ -131,26 +131,6 @@ def create_dash_app(df_w, df_g, df_r):
         lat = line.loc[:,'lat'].tolist()
         lon = line.loc[:,'lon'].tolist()
 
-        geojson_dict = {"id": "route", 
-                                "type": "line",
-                                "source":{
-                                    "type": "geojson",
-                                    "data": {
-                                        "type": "Feature",
-                                        "geometry": {
-                                            "type": "LineString",
-                                            "coordinates": [[float(lat[x]), float(lon[x])] for x in range(0,len(lat))]
-                                        }
-                                    }
-                                }}
-
-        layers=[dict(sourcetype = 'geojson',
-                source =geojson_dict,
-                color='rgb(0,0,230)',
-                type = 'line',
-                line=dict(width=1.5))
-            ]
-
         data=[
             go.Scattermapbox(
                 lat=lat,
@@ -165,7 +145,6 @@ def create_dash_app(df_w, df_g, df_r):
             hovermode='closest',
             mapbox=dict(
             accesstoken=mapbox_access_token,
-            layers = layers,
             bearing=0,
             center=dict(lat=float(lat[0]),lon=float(lon[0])),
             pitch=0,

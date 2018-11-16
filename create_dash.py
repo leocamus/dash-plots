@@ -15,7 +15,7 @@ import os
 
 def create_dash_app(df_w, df_g, df_r):
     app = dash.Dash('Travel Times')
-
+#    server = app.server
     travel_times_dir = constants.travel_times_dir
     test_dir = os.path.join(travel_times_dir, 'maps/test.html')
 
@@ -158,6 +158,6 @@ def create_dash_app(df_w, df_g, df_r):
     return app
 
 if __name__ == '__main__':
-    [grouped_df_tt_w, grouped_df_tt_g, df_r_w] = assemble_data('13.11.2018', '24.10.2018', '25.10.2018')
+    [grouped_df_tt_w, grouped_df_tt_g, df_r_w] = assemble_data('16.11.2018', '24.10.2018', '25.10.2018')
     app = create_dash_app(grouped_df_tt_w, grouped_df_tt_g, df_r_w)
-    app.run_server(host = '0.0.0.0', port = 8080)
+    app.run_server()

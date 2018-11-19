@@ -3,14 +3,6 @@ import pandas as pd
 import datetime as dt
 from utils import constants
 
-
-def query_database(freq):
-    # The connection should be open all the time.
-    # Data is retrieved with some frequency.
-    # Pandas dataframe is built and manipulated to build the Dash app
-    pass
-
-
 def read_waze_data(extraction_date):
     # Should be replaced for a connection to a ddbb
     waze_dir = constants.waze_travel_times_dir
@@ -32,12 +24,12 @@ def read_gps_data(*args):
 
     for arg in args:
         travel_times = os.path.join(gps_dir, 'velocidadesIrPO' + arg.split(".")[0] + '.xlsx')
-        df_tt = pd.read_excel(travel_times, encoding='latin-1') #"periodo" is parsed as datetime.time object.
+        df_tt = pd.read_excel(travel_times, encoding='latin-1', na_values = '-') #"periodo" is parsed as datetime.time object.
         frames.append(df_tt)
 
     df_tt = pd.concat(frames)
     df_tt.reset_index(inplace=True)
-    df_tt = df_tt.rename(columns={'tiempo (s/km)': 'time/length'})
+    df_tt = df_tt.rename(columns={'tiempo (s/km)': 'time/length[s/km]'})
 
     def names_compatibility(x):
         if x==8:
@@ -59,6 +51,7 @@ def read_gps_data(*args):
     df_tt['name'] = df_tt['itramo'].apply(names_compatibility)
     df_tt['date'] = df_tt.apply(lambda x: dates_compatibility(x['servicio']), axis=1)
     df_tt['updatetime'] = df_tt.apply(lambda x: produce_datetime(x['date'], x['periodo']), axis=1)
+    df_tt['length/time[km/h]'] = (df_tt['distComple'] / (df_tt['tiempoComple']))*3.6
     
     return df_tt
 
@@ -70,10 +63,11 @@ def process_waze_data(df_tt, df_r):
 
     df_tt = df_tt.merge(df_r[['name', 'length']], on='name', how='left')
     df_tt = df_tt.loc[df_tt['length'].isnull() == False, :]
-    df_tt['time/length'] = (df_tt['time'] / (df_tt['length']))*1000
+    df_tt['time/length[s/km]'] = (df_tt['time'] / (df_tt['length']))*1000
+    df_tt['length/time[km/h]'] = (df_tt['length'] / (df_tt['time']))*3.6
 
     grouped_df_tt = df_tt.groupby(["name", pd.Grouper(
-        freq="15min", key="updatetime")])['time/length'].mean().to_frame()
+        freq="15min", key="updatetime")])['time/length[s/km]','length/time[km/h]'].mean()
     grouped_df_tt.reset_index(inplace=True)
 
     grouped_df_tt['date'] = grouped_df_tt['updatetime'].dt.date

@@ -10,7 +10,7 @@ import urllib
 from plotly import tools
 from dash.dependencies import Input, Output
 from utils import constants, tokens
-from retrieve_data_dev import assemble_data
+from retrieve_data import assemble_data
 
 [df_tt_w, df_tt_g, df_r_w] = assemble_data('16.11.2018', '24.10.2018', '25.10.2018')
 

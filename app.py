@@ -51,7 +51,7 @@ def create_traces(df, query_route, query_date, source):
     return trace_y1, trace_y2
 
 app = dash.Dash('Travel Times')
-mapbox_access_token = tokens.mapbox_token
+mapbox_access_token = tokens.get_mapbox_token()
 
 app.layout = html.Div([
     # This component generates a <h1></h1> HTML element in your application
